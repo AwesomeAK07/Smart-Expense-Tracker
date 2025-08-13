@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Expense Tracker{% endblock %}
+
+{% block content %}
+<!-- Header Section -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h2 mb-1">
+            <i class="bi bi-graph-up me-2"></i>
+            Expense Dashboard
+        </h1>
+        <p class="text-muted mb-0">Track and analyze your spending patterns</p>
+    </div>
+    <div>
+        <a href="{{ url_for('home') }}" class="btn btn-primary me-2">
+            <i class="bi bi-plus-circle me-2"></i>
+            Add Receipt
+        </a>
+        <a href="{{ url_for('export_csv') }}" class="btn btn-outline-success">
+            <i class="bi bi-download me-2"></i>
+            Export CSV
+        </a>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Total Expenses</h6>
+                        <h3>${{ "%.2f"|format(total_amount) }}</h3>
+                    </div>
+                    <i class="bi bi-currency-dollar display-6"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Total Records</h6>
+                        <h3>{{ expenses|length }}</h3>
+                    </div>
+                    <i class="bi bi-receipt display-6"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Categories</h6>
+                        <h3>{{ categories|length }}</h3>
+                    </div>
+                    <i class="bi bi-tags display-6"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="card stats-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-1">Avg. Per Record</h6>
+                        <h3>${{ "%.2f"|format(total_amount / expenses|length if expenses|length > 0 else 0) }}</h3>
+                    </div>
+                    <i class="bi bi-calculator display-6"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="row mb-4">
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart me-2"></i>
+                    Spending by Category
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Monthly Spending Trend
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="monthlyChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expenses Table -->
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-table me-2"></i>
+                All Expenses
+            </h5>
+            <div class="d-flex gap-2">
+                <input type="text" class="form-control form-control-sm" id="searchInput" placeholder="Search expenses..." style="width: 200px;">
+                <select class="form-select form-select-sm" id="categoryFilter" style="width: 150px;">
+                    <option value="">All Categories</option>
+                    {% for category in categories.keys() %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="expensesTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Amount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for expense in expenses %}
+                    <tr>
+                        <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ expense.description }}</td>
+                        <td>
+                            <span class="badge category-badge bg-{{ 'primary' if expense.category == 'Food' else 'success' if expense.category == 'Transport' else 'warning' if expense.category == 'Shopping' else 'danger' if expense.category == 'Bills' else 'secondary' }}">
+                                {{ expense.category }}
+                            </span>
+                        </td>
+                        <td class="fw-bold">${{ "%.2f"|format(expense.amount) }}</td>
+                        <td>
+                            <form action="{{ url_for('delete_expense', expense_id=expense.id) }}" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this expense?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if expenses|length == 0 %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+            <h5 class="text-muted">No expenses found</h5>
+            <p class="text-muted">Upload your first receipt to get started!</p>
+            <a href="{{ url_for('home') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>
+                Add Receipt
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Category Chart
+    const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+    const categoryData = {
+        labels: {{ categories.keys() | list | tojson }},
+        datasets: [{
+            data: {{ categories.values() | list | tojson }},
+            backgroundColor: [
+                '#FF6384',
+                '#36A2EB',
+                '#FFCE56',
+                '#4BC0C0',
+                '#9966FF',
+                '#FF9F40'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+        }]
+    };
+    
+    new Chart(categoryCtx, {
+        type: 'doughnut',
+        data: categoryData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+    
+    // Monthly Chart
+    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+    const monthlyData = {
+        labels: {{ monthly_data.keys() | list | tojson }},
+        datasets: [{
+            label: 'Monthly Spending',
+            data: {{ monthly_data.values() | list | tojson }},
+            borderColor: '#36A2EB',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+        }]
+    };
+    
+    new Chart(monthlyCtx, {
+        type: 'line',
+        data: monthlyData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Search and Filter functionality
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const table = document.getElementById('expensesTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    function filterTable() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const categoryTerm = categoryFilter.value.toLowerCase();
+        
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const cells = row.getElementsByTagName('td');
+            
+            const description = cells[1].textContent.toLowerCase();
+            const category = cells[2].textContent.toLowerCase();
+            
+            const matchesSearch = description.includes(searchTerm);
+            const matchesCategory = categoryTerm === '' || category.includes(categoryTerm);
+            
+            if (matchesSearch && matchesCategory) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        }
+    }
+    
+    searchInput.addEventListener('input', filterTable);
+    categoryFilter.addEventListener('change', filterTable);
+    
+    // Auto-refresh data every 30 seconds
+    setInterval(function() {
+        fetch('/api/expenses')
+            .then(response => response.json())
+            .then(data => {
+                // Update table if needed
+                console.log('Data refreshed');
+            })
+            .catch(error => console.error('Error refreshing data:', error));
+    }, 30000);
+});
+</script>
+{% endblock %}
